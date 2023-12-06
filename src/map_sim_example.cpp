@@ -19,7 +19,7 @@ Description: This is a ROS example to use the DSP map. The map object is my_map 
 
 
 #include "ros/ros.h"
-#include "dsp_dynamic.h" // You can change the head file to "dsp_dynamic_multiple_neighbors.h" or "dsp_static.h" to use different map types. For more information, please refer to the readme file.
+#include "dsp_static.h" // You can change the head file to "dsp_dynamic_multiple_neighbors.h" or "dsp_static.h" to use different map types. For more information, please refer to the readme file.
 #include <pcl/common/transforms.h>
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/point_types.h>
@@ -37,7 +37,7 @@ Description: This is a ROS example to use the DSP map. The map object is my_map 
 
 /// Define a map object
 DSPMap my_map;
-const float res = 0.1;
+const float res = 0.2;
 /// Set global variables
 queue<double> pose_att_time_queue;
 queue<Eigen::Vector3d> uav_position_global_queue;
@@ -154,7 +154,7 @@ void showFOV(Eigen::Vector3d &position, Eigen::Quaternionf &att, double angle_h,
     rotateVectorByQuaternion(p4, att);
 
     visualization_msgs::Marker fov;
-    fov.header.frame_id = "map";
+    fov.header.frame_id = "base";
     fov.header.stamp = ros::Time::now();
     fov.action = visualization_msgs::Marker::ADD;
     fov.ns = "lines_and_points";
@@ -318,9 +318,13 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud)
 
     int useful_point_num = 0;
     for(int i=0; i<cloud_filtered->width; i++){
-        float x = cloud_filtered->points.at(i).z;
-        float y = -cloud_filtered->points.at(i).x;
-        float z = -cloud_filtered->points.at(i).y;
+        // float x = cloud_filtered->points.at(i).z;
+        // float y = -cloud_filtered->points.at(i).x;
+        // float z = -cloud_filtered->points.at(i).y;
+
+        float x = cloud_filtered->points.at(i).x;
+        float y = cloud_filtered->points.at(i).y;
+        float z = cloud_filtered->points.at(i).z;
 
         if(inRange(x_min, x_max, x) && inRange(y_min, y_max, y) && inRange(z_min, z_max, z))
         {
@@ -379,7 +383,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud)
 
     /// Publish Point cloud and center position
     pcl::toROSMsg(cloud_to_publish, cloud_to_pub_transformed);
-    cloud_to_pub_transformed.header.frame_id = "map";
+    cloud_to_pub_transformed.header.frame_id = "world";
     cloud_to_pub_transformed.header.stamp = cloud->header.stamp;
     cloud_pub.publish(cloud_to_pub_transformed);
 
@@ -422,7 +426,7 @@ void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& cloud)
 
     sensor_msgs::PointCloud2 cloud_future_transformed;
     pcl::toROSMsg(future_status_cloud, cloud_future_transformed);
-    cloud_future_transformed.header.frame_id = "map";
+    cloud_future_transformed.header.frame_id = "world";
     cloud_future_transformed.header.stamp = cloud->header.stamp;
     future_status_pub.publish(cloud_future_transformed);
 
@@ -519,8 +523,8 @@ int main(int argc, char **argv)
     ros::NodeHandle n;
 
     /// Map parameters that can be changed dynamically. But usually we still use them as static parameters.
-    my_map.setPredictionVariance(0.05, 0.05); // StdDev for prediction. velocity StdDev, position StdDev, respectively.
-    my_map.setObservationStdDev(0.1); // StdDev for update. position StdDev.
+    my_map.setPredictionVariance(0.0000001, 0.0000001); // StdDev for prediction. velocity StdDev, position StdDev, respectively.
+    my_map.setObservationStdDev(0.0000001); // StdDev for update. position StdDev.
     my_map.setNewBornParticleNumberofEachPoint(20); // Number of new particles generated from one measurement point.
     my_map.setNewBornParticleWeight(0.0001); // Initial weight of particles.
     DSPMap::setOriginalVoxelFilterResolution(res); // Resolution of the voxel filter used for point cloud pre-process.
@@ -532,8 +536,10 @@ int main(int argc, char **argv)
     ros::Subscriber object_states_sub = n.subscribe("/gazebo/model_states", 1, simObjectStateCallback);
 
     /// Input data for the map
-    ros::Subscriber point_cloud_sub = n.subscribe("/camera_front/depth/points", 1, cloudCallback);
-    ros::Subscriber pose_sub = n.subscribe("/mavros/local_position/pose", 1, simPoseCallback);
+    // ros::Subscriber point_cloud_sub = n.subscribe("/camera_front/depth/points", 1, cloudCallback);
+    // ros::Subscriber pose_sub = n.subscribe("/mavros/local_position/pose", 1, simPoseCallback);
+    ros::Subscriber point_cloud_sub = n.subscribe("/map_generator/local_click_map", 1, cloudCallback);
+    ros::Subscriber pose_sub = n.subscribe("/odom_visualization/pose", 1, simPoseCallback);
 
     /// Visualization topics
     cloud_pub = n.advertise<sensor_msgs::PointCloud2>("/my_map/cloud_ob", 1, true);
